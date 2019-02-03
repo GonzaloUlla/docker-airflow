@@ -4,18 +4,20 @@ from airflow.operators.python_operator import PythonOperator
 
 import pandas as pd
 import requests
+import os
 import io
 import logging
 import time
 from datetime import timedelta, date
 
 
+OUTPUTS_FOLDER = "/usr/local/airflow/outputs/"
 SYMBOL_LIST_URL = "https://www.alphavantage.co/digital_currency_list/"
 API_ENDPOINT = "https://www.alphavantage.co/query"
 API_FUNCTION = "DIGITAL_CURRENCY_DAILY"
 API_DATATYPE = "csv"
-API_KEY = ["V26HZ0GFH4GWYJPG"]
-# OLD_API_KEYS = ["HE6HPTT0QFHG2ZYY", "OWGOAH1MLEK1J3IA", "B4YVATR33W46TE6R", "PMCQ61RYQ7T7TUFY"]
+API_KEY = "V26HZ0GFH4GWYJPG"
+# OTHER_API_KEYS = ["HE6HPTT0QFHG2ZYY", "OWGOAH1MLEK1J3IA", "B4YVATR33W46TE6R", "PMCQ61RYQ7T7TUFY"]
 
 args = {
     'owner': 'airflow',
@@ -53,9 +55,10 @@ def __read_currencies():
 
 
 def __retrieve_data(symbol):
-    params = {'function': API_FUNCTION, 'market': 'USD', 'apikey': API_KEY,
-              'datatype': API_DATATYPE}  # Only USD
-    limit = 5  # "500 API requests per day"
+    params = {'function': API_FUNCTION, 'market': 'USD',  # Only USD
+              'apikey': API_KEY, 'datatype': API_DATATYPE}
+
+    limit = 450  # "500 API requests per day", 50 for digital_currency_by_date
     symbol = symbol.head(limit)
     start_time = time.time()
     logger.info(
@@ -74,7 +77,7 @@ def __retrieve_data(symbol):
             logger.info("Added data from currency: {0}".format(
                 s_row['currency code']))
         else:
-            logger.info("Error calling API endpoint: {0}".format(url_data))
+            logger.warn("Error calling API endpoint: {0}".format(url_data))
 
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -98,8 +101,11 @@ def __remove_duplicated_columns(frame):
 def __export_to_csv(frame_to_export):
     logger.info("Exporting dataframe to csv...")
     timestamp = frame_to_export.iloc[0]['timestamp']
-    frame_to_export.to_csv(
-        path_or_buf="{0}.csv".format(timestamp), index=False)
+    file_name = "currencies-daily-{0}.csv".format(timestamp)
+    frame_to_export.to_csv(path_or_buf="{0}{1}".format(
+        OUTPUTS_FOLDER, file_name), index=False)
+    if os.path.isfile(file_name):
+        logger.info("[FINISHED] File {0} exported.".format(file_name))
 
 
 def read_and_export(ds, **kwargs):

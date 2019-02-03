@@ -19,8 +19,9 @@ services:
             - SENSOR_CURRENCY=${CURRENCY:-BTC}
             - SENSOR_DATE=${DATE:-2019-02-05}
         volumes:
-            - ./dags_and_outputs:/usr/local/airflow/dags
+            - ./dags:/usr/local/airflow/dags
             - ./logs:/usr/local/airflow/logs
+            - ./outputs:/usr/local/airflow/outputs
         ports:
             - "8080:8080"
         command: webserver

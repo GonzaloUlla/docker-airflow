@@ -12,16 +12,15 @@ import time
 from datetime import datetime, timedelta, date
 import matplotlib
 
-from digital_currency_daily import API_ENDPOINT, API_FUNCTION, API_DATATYPE, get_logger
+from digital_currency_daily import OUTPUTS_FOLDER, API_ENDPOINT, API_FUNCTION, API_DATATYPE, API_KEY, get_logger
 
 
-API_KEY = "PMCQ61RYQ7T7TUFY"
 SENSOR_CURRENCY = os.environ['SENSOR_CURRENCY']
 SENSOR_DATE = os.environ['SENSOR_DATE']
 
 args = {
     'owner': 'airflow',
-    'start_date': airflow.utils.dates.days_ago(2, hour=12),
+    'start_date': airflow.utils.dates.days_ago(9, hour=12),
     "retries": 3,
     "retry_delay": timedelta(minutes=5),
 }
@@ -29,7 +28,7 @@ args = {
 dag = DAG(
     dag_id='digital_currency_by_date',
     default_args=args,
-    schedule_interval=None,
+    schedule_interval='@weekly',
     catchup=False
 )
 
@@ -43,9 +42,9 @@ logger = get_logger("digital_currency_by_date")
 
 
 def response_check(response):
-    logger.info("Checking HTTP response from API endpoint...")
-    logger.info(
-        "---------- Currency: {0}, Date: {1}".format(SENSOR_CURRENCY, SENSOR_DATE))
+    logger.info("---------- Checking HTTP response from API endpoint...")
+    logger.info("Currency: {0}, Date: {1}".format(
+        SENSOR_CURRENCY, SENSOR_DATE))
 
     url_data = response.content
     df = pd.read_csv(io.StringIO(url_data.decode('utf-8')),
@@ -57,7 +56,7 @@ def response_check(response):
         if not desired_date > last_available_date:
             logger.info("Data is now available!")
             return True
-    logger.info("Data is not yet available...")
+    logger.info("Data is not available yet. Sleeping for 30 minutes...")
     return False
 
 
@@ -66,7 +65,7 @@ sensor_task = HttpSensor(task_id='currency_date_sensor',
                          http_conn_id='http_alphavantage',
                          request_params=params,
                          response_check=response_check,
-                         poke_interval=900,
+                         poke_interval=1800,  # Each 30 minutes, 1 week timeout
                          dag=dag)
 
 
@@ -85,10 +84,12 @@ def __retrieve_data():
 
     end_time = time.time()
     logger.info(
-        "---------- Data retrieved in: {0} seconds".format(end_time - start_time))
-    df.to_csv(
-        path_or_buf="{0}-{1}.csv".format(SENSOR_CURRENCY, SENSOR_DATE), index=False)
-
+        "Data retrieved in: {0} seconds".format(end_time - start_time))
+    file_name = "{0}-last-30d-aux-{1}.csv".format(SENSOR_CURRENCY, SENSOR_DATE)
+    df.to_csv(path_or_buf="{0}{1}".format(
+        OUTPUTS_FOLDER, file_name), index=False)
+    if os.path.isfile(file_name):
+        logger.info("Pre-processing file {0} exported.".format(file_name))
     return df
 
 
@@ -98,12 +99,13 @@ def __export_plot(df):
 
     title = "Open and close prices of BTC in last 30 days"
     fig = df.plot(title=title, grid=True).get_figure()
-    fig.savefig(
-        "{0}-last-30d-from-{1}.pdf".format(SENSOR_CURRENCY, SENSOR_DATE))
-
+    file_name = "{0}-last-30d-plot-{1}.pdf".format(
+        SENSOR_CURRENCY, SENSOR_DATE)
+    fig.savefig("{0}{1}".format(OUTPUTS_FOLDER, file_name))
     end_time = time.time()
-    logger.info(
-        "---------- Plot exported in: {0} seconds".format(end_time - start_time))
+    if os.path.isfile(file_name):
+        logger.info(
+            "Plot {0} exported in: {1} seconds".format(file_name, end_time - start_time))
 
 
 def __log_avg_difference(df):
@@ -111,16 +113,17 @@ def __log_avg_difference(df):
     start_time = time.time()
 
     avg_diff = sum(abs(df['open (USD)'] - df['close (USD)'])) / 30
-    file_name = "{0}-last-30d-avg-{1}.csv".format(SENSOR_CURRENCY, SENSOR_DATE)
+    file_name = "avg-diff-open-close-last-30d.csv"
     if not os.path.isfile(file_name):
-        with open(file_name, 'w') as fd:
+        with open("{0}{1}".format(OUTPUTS_FOLDER, file_name), 'w') as fd:
             fd.write("currency code,last date,avg diff last 30d (USD)")
-    with open(file_name, 'a') as fd:
-        fd.write("\n{0},{1},{2}".format(SENSOR_CURRENCY, SENSOR_DATE, avg_diff))
+    with open("{0}{1}".format(OUTPUTS_FOLDER, file_name), 'a') as fd:
+        fd.write("\n{0},{1},{2}".format(
+            SENSOR_CURRENCY, SENSOR_DATE, avg_diff))
 
     end_time = time.time()
     logger.info(
-        "---------- Average difference logged in: {0} seconds".format(end_time - start_time))
+        "AVG difference logged to {0} in: {1} seconds".format(file_name, end_time - start_time))
 
 
 def plot_and_log(ds, **kwargs):
