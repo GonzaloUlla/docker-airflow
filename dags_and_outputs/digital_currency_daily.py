@@ -15,12 +15,12 @@ SYMBOL_LIST_URL = "https://www.alphavantage.co/digital_currency_list/"
 API_ENDPOINT = "https://www.alphavantage.co/query"
 API_FUNCTION = "DIGITAL_CURRENCY_DAILY"
 API_DATATYPE = "csv"
-API_KEY = ["OWGOAH1MLEK1J3IA"]
-# OLD_API_KEYS = ["HE6HPTT0QFHG2ZYY", "V26HZ0GFH4GWYJPG", "B4YVATR33W46TE6R", "PMCQ61RYQ7T7TUFY"]
+API_KEY = ["V26HZ0GFH4GWYJPG"]
+# OLD_API_KEYS = ["HE6HPTT0QFHG2ZYY", "OWGOAH1MLEK1J3IA", "B4YVATR33W46TE6R", "PMCQ61RYQ7T7TUFY"]
 
 args = {
     'owner': 'airflow',
-    'start_date': airflow.utils.dates.days_ago(1, hour=12),
+    'start_date': airflow.utils.dates.days_ago(2, hour=12),
     "retries": 3,
     "retry_delay": timedelta(minutes=5),
 }
@@ -28,7 +28,7 @@ args = {
 dag = DAG(
     dag_id='digital_currency_daily',
     default_args=args,
-    schedule_interval=timedelta(minutes=5),
+    schedule_interval=timedelta(days=1),
 )
 
 
@@ -50,7 +50,7 @@ def __read_currencies(logger):
 def __retrieve_data(logger, symbol):
     params = {'function': API_FUNCTION, 'market': 'USD', 'apikey': API_KEY,
               'datatype': API_DATATYPE}  # Only USD
-    limit = 5 # "500 API requests per day"
+    limit = 500 # "500 API requests per day"
     symbol = symbol.head(limit)              
     start_time = time.time()
     logger.info("Starting to read first {0} digital currencies...".format(limit))
