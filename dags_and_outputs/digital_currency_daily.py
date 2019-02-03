@@ -5,7 +5,6 @@ from airflow.operators.python_operator import PythonOperator
 import pandas as pd
 import requests
 import io
-import sys
 import logging
 import time
 from datetime import timedelta, date
@@ -32,28 +31,35 @@ dag = DAG(
 )
 
 
-def __create_logger():
-    logFormatter = logging.Formatter("[%(asctime)s] {{%(filename)s:%(lineno)d}} %(levelname)s - %(message)s")
-    logger = logging.getLogger()
+def get_logger(prefix):
+    logFormatter = logging.Formatter(
+        "[%(asctime)s] {{%(filename)s:%(lineno)d}} %(levelname)s - %(message)s")
+    logger = logging.getLogger(prefix)
 
-    fileHandler = logging.FileHandler("/usr/local/airflow/logs/digital_currency_daily_{0}.log".format(str(date.today())))
+    fileHandler = logging.FileHandler(
+        "/usr/local/airflow/logs/{0}_{1}.log".format(prefix, str(date.today())))
     fileHandler.setFormatter(logFormatter)
     logger.addHandler(fileHandler)
 
     return logger
 
-def __read_currencies(logger):
+
+logger = get_logger("digital_currency_daily")
+
+
+def __read_currencies():
     logger.info("Reading digital currencies...")
     return pd.read_csv(SYMBOL_LIST_URL)
 
 
-def __retrieve_data(logger, symbol):
+def __retrieve_data(symbol):
     params = {'function': API_FUNCTION, 'market': 'USD', 'apikey': API_KEY,
               'datatype': API_DATATYPE}  # Only USD
-    limit = 500 # "500 API requests per day"
-    symbol = symbol.head(limit)              
+    limit = 5  # "500 API requests per day"
+    symbol = symbol.head(limit)
     start_time = time.time()
-    logger.info("Starting to read first {0} digital currencies...".format(limit))
+    logger.info(
+        "Starting to read first {0} digital currencies...".format(limit))
     list_ = []
 
     for s_index, s_row in symbol.iterrows():
@@ -65,7 +71,8 @@ def __retrieve_data(logger, symbol):
             df.insert(0, 'currency code',
                       s_row['currency code'], allow_duplicates=False)
             list_.append(df)
-            logger.info("Added data from currency: {0}".format(s_row['currency code']))
+            logger.info("Added data from currency: {0}".format(
+                s_row['currency code']))
         else:
             logger.info("Error calling API endpoint: {0}".format(url_data))
 
@@ -81,14 +88,14 @@ def __retrieve_data(logger, symbol):
     return pd.concat(list_, axis=0, ignore_index=True)
 
 
-def __remove_duplicated_columns(logger, frame):
+def __remove_duplicated_columns(frame):
     logger.info("Removing duplicated columns...")
     frame.drop(['open (USD).1', 'high (USD).1', 'low (USD).1',
                 'close (USD).1'], axis=1, inplace=True)
     return frame
 
 
-def __export_to_csv(logger, frame_to_export):
+def __export_to_csv(frame_to_export):
     logger.info("Exporting dataframe to csv...")
     timestamp = frame_to_export.iloc[0]['timestamp']
     frame_to_export.to_csv(
@@ -96,11 +103,10 @@ def __export_to_csv(logger, frame_to_export):
 
 
 def read_and_export(ds, **kwargs):
-    logger = __create_logger()
-    symbol = __read_currencies(logger)
-    frame = __retrieve_data(logger, symbol)
-    frame_to_export = __remove_duplicated_columns(logger, frame)
-    __export_to_csv(logger, frame_to_export)
+    symbol = __read_currencies()
+    frame = __retrieve_data(symbol)
+    frame_to_export = __remove_duplicated_columns(frame)
+    __export_to_csv(frame_to_export)
 
 
 read_and_export_task = PythonOperator(
