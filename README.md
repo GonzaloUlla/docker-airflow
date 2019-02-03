@@ -8,10 +8,11 @@ Using *DIGITAL_CURRENCY_DAILY* endpoint.
 docker-compose build
 docker-compose up -d
 ```
-* Browse to `localhost:8080` and activate *digital_currency_daily* DAG
+* Check logs: `./logs/digital_currency-*.log`
+* Check outputs under: `./outputs/` (there are some sample outputs)
 ### Notes
 * API throughput limited to *"5 API requests per minute; 500 API requests per day*"
-* Taking only USD market and first 500 digital currencies, execution time goes up to ~1h48min
+* Taking only USD market and first 450 digital currencies, execution time goes up to ~1h37min
 
 # docker-airflow
 [![CircleCI](https://circleci.com/gh/puckel/docker-airflow/tree/master.svg?style=svg)](https://circleci.com/gh/puckel/docker-airflow/tree/master)
