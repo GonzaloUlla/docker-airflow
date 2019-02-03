@@ -28,8 +28,7 @@ args = {
 dag = DAG(
     dag_id='digital_currency_by_date',
     default_args=args,
-    schedule_interval='@weekly',
-    catchup=False
+    schedule_interval='@weekly'
 )
 
 params = {'function': API_FUNCTION,
@@ -60,16 +59,7 @@ def response_check(response):
     return False
 
 
-sensor_task = HttpSensor(task_id='currency_date_sensor',
-                         endpoint='query',
-                         http_conn_id='http_alphavantage',
-                         request_params=params,
-                         response_check=response_check,
-                         poke_interval=1800,  # Each 30 minutes, 1 week timeout
-                         dag=dag)
-
-
-def __retrieve_data():
+def retrieve_data():
     logger.info("Retriving data...")
     start_time = time.time()
 
@@ -88,33 +78,35 @@ def __retrieve_data():
     file_name = "{0}-last-30d-aux-{1}.csv".format(SENSOR_CURRENCY, SENSOR_DATE)
     df.to_csv(path_or_buf="{0}{1}".format(
         OUTPUTS_FOLDER, file_name), index=False)
-    if os.path.isfile(file_name):
+    if os.path.isfile("{0}{1}".format(OUTPUTS_FOLDER, file_name)):
         logger.info("Pre-processing file {0} exported.".format(file_name))
     return df
 
 
-def __export_plot(df):
+def export_plot(**context):
     logger.info("Exporting plot to PDF...")
     start_time = time.time()
 
+    df = context['task_instance'].xcom_pull(task_ids='retrieve_data')
     title = "Open and close prices of BTC in last 30 days"
     fig = df.plot(title=title, grid=True).get_figure()
     file_name = "{0}-last-30d-plot-{1}.pdf".format(
         SENSOR_CURRENCY, SENSOR_DATE)
     fig.savefig("{0}{1}".format(OUTPUTS_FOLDER, file_name))
     end_time = time.time()
-    if os.path.isfile(file_name):
+    if os.path.isfile("{0}{1}".format(OUTPUTS_FOLDER, file_name)):
         logger.info(
             "Plot {0} exported in: {1} seconds".format(file_name, end_time - start_time))
 
 
-def __log_avg_difference(df):
+def log_avg_difference(**context):
     logger.info("Logging average difference between open and close prices...")
     start_time = time.time()
 
+    df = context['task_instance'].xcom_pull(task_ids='retrieve_data')
     avg_diff = sum(abs(df['open (USD)'] - df['close (USD)'])) / 30
     file_name = "avg-diff-open-close-last-30d.csv"
-    if not os.path.isfile(file_name):
+    if not os.path.isfile("{0}{1}".format(OUTPUTS_FOLDER, file_name)):
         with open("{0}{1}".format(OUTPUTS_FOLDER, file_name), 'w') as fd:
             fd.write("currency code,last date,avg diff last 30d (USD)")
     with open("{0}{1}".format(OUTPUTS_FOLDER, file_name), 'a') as fd:
@@ -122,22 +114,43 @@ def __log_avg_difference(df):
             SENSOR_CURRENCY, SENSOR_DATE, avg_diff))
 
     end_time = time.time()
-    logger.info(
-        "AVG difference logged to {0} in: {1} seconds".format(file_name, end_time - start_time))
+    if os.path.isfile("{0}{1}".format(OUTPUTS_FOLDER, file_name)):
+        logger.info("AVG difference logged to {0} in: {1} seconds".format(
+            file_name, end_time - start_time))
 
 
-def plot_and_log(ds, **kwargs):
-    df = __retrieve_data()
-    __export_plot(df)
-    __log_avg_difference(df)
+sensor_task = HttpSensor(task_id='currency_date_sensor',
+                         endpoint='query',
+                         http_conn_id='http_alphavantage',
+                         request_params=params,
+                         response_check=response_check,
+                         poke_interval=1800,  # Each 30 minutes, 1 week timeout, 48 requests/day
+                         dag=dag)
 
 
-plot_and_log_task = PythonOperator(
-    task_id='plot_and_log',
-    provide_context=True,
-    python_callable=plot_and_log,
+retrieve_data_task = PythonOperator(
+    task_id='retrieve_data',
+    provide_context=False,
+    python_callable=retrieve_data,
     dag=dag,
 )
 
 
-sensor_task >> plot_and_log_task
+export_plot_task = PythonOperator(
+    task_id='export_plot',
+    provide_context=True,
+    python_callable=export_plot,
+    dag=dag,
+)
+
+
+log_avg_difference_task = PythonOperator(
+    task_id='log_avg_difference',
+    provide_context=True,
+    python_callable=log_avg_difference,
+    dag=dag,
+)
+
+
+sensor_task >> retrieve_data_task >> [
+    export_plot_task, log_avg_difference_task]

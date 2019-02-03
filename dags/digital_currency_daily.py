@@ -21,7 +21,7 @@ API_KEY = "V26HZ0GFH4GWYJPG"
 
 args = {
     'owner': 'airflow',
-    'start_date': airflow.utils.dates.days_ago(2, hour=12),
+    'start_date': airflow.utils.dates.days_ago(1, hour=12),
     "retries": 3,
     "retry_delay": timedelta(minutes=5),
 }
@@ -49,17 +49,18 @@ def get_logger(prefix):
 logger = get_logger("digital_currency_daily")
 
 
-def __read_currencies():
+def read_currencies():
     logger.info("Reading digital currencies...")
     return pd.read_csv(SYMBOL_LIST_URL)
 
 
-def __retrieve_data(symbol):
+def retrieve_data(**context):
     params = {'function': API_FUNCTION, 'market': 'USD',  # Only USD
               'apikey': API_KEY, 'datatype': API_DATATYPE}
 
     limit = 450  # "500 API requests per day", 50 for digital_currency_by_date
-    symbol = symbol.head(limit)
+    symbol = context['task_instance'].xcom_pull(
+        task_ids='read_currencies').head(limit)
     start_time = time.time()
     logger.info(
         "Starting to read first {0} digital currencies...".format(limit))
@@ -91,33 +92,56 @@ def __retrieve_data(symbol):
     return pd.concat(list_, axis=0, ignore_index=True)
 
 
-def __remove_duplicated_columns(frame):
+def remove_duplicated_columns(**context):
     logger.info("Removing duplicated columns...")
+    frame = context['task_instance'].xcom_pull(task_ids='retrieve_data')
     frame.drop(['open (USD).1', 'high (USD).1', 'low (USD).1',
                 'close (USD).1'], axis=1, inplace=True)
     return frame
 
 
-def __export_to_csv(frame_to_export):
+def export_to_csv(**context):
     logger.info("Exporting dataframe to csv...")
+    frame_to_export = context['task_instance'].xcom_pull(
+        task_ids='remove_duplicated_columns')
     timestamp = frame_to_export.iloc[0]['timestamp']
     file_name = "currencies-daily-{0}.csv".format(timestamp)
     frame_to_export.to_csv(path_or_buf="{0}{1}".format(
         OUTPUTS_FOLDER, file_name), index=False)
-    if os.path.isfile(file_name):
+    if os.path.isfile("{0}{1}".format(OUTPUTS_FOLDER, file_name)):
         logger.info("[FINISHED] File {0} exported.".format(file_name))
 
 
-def read_and_export(ds, **kwargs):
-    symbol = __read_currencies()
-    frame = __retrieve_data(symbol)
-    frame_to_export = __remove_duplicated_columns(frame)
-    __export_to_csv(frame_to_export)
-
-
-read_and_export_task = PythonOperator(
-    task_id='read_and_export',
-    provide_context=True,
-    python_callable=read_and_export,
+read_currencies_task = PythonOperator(
+    task_id='read_currencies',
+    provide_context=False,
+    python_callable=read_currencies,
     dag=dag,
 )
+
+
+retrieve_data_task = PythonOperator(
+    task_id='retrieve_data',
+    provide_context=True,
+    python_callable=retrieve_data,
+    dag=dag,
+)
+
+
+remove_duplicated_columns_task = PythonOperator(
+    task_id='remove_duplicated_columns',
+    provide_context=True,
+    python_callable=remove_duplicated_columns,
+    dag=dag,
+)
+
+
+export_to_csv_task = PythonOperator(
+    task_id='export_to_csv',
+    provide_context=True,
+    python_callable=export_to_csv,
+    dag=dag,
+)
+
+
+read_currencies_task >> retrieve_data_task >> remove_duplicated_columns_task >> export_to_csv_task
