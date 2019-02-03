@@ -16,6 +16,8 @@ services:
         environment:
             - LOAD_EX=n
             - EXECUTOR=Local
+            - SENSOR_CURRENCY=${CURRENCY:-BTC}
+            - SENSOR_DATE=${DATE:-2019-02-05}
         volumes:
             - ./dags_and_outputs:/usr/local/airflow/dags
             - ./logs:/usr/local/airflow/logs

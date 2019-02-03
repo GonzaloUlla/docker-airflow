@@ -73,6 +73,7 @@ case "$1" in
     if [ "$AIRFLOW__CORE__EXECUTOR" = "LocalExecutor" ]; then
       # With the "Local" executor it should all run in one container.
       airflow scheduler &
+      airflow connections -a --conn_id http_alphavantage --conn_uri https://www.alphavantage.co
     fi
     exec airflow webserver
     ;;
