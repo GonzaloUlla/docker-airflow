@@ -1,3 +1,18 @@
+# APIs, Airflow and Pandas exercise
+> Based on: [puckel/docker-airflow](https://github.com/puckel/docker-airflow)
+
+Using *DIGITAL_CURRENCY_DAILY* endpoint.
+### How to
+* Run:
+```bash
+docker-compose build
+docker-compose up -d
+```
+* Browse to `localhost:8080` and activate *digital_currency_daily* DAG
+### Notes
+* API throughput limited to *"5 API requests per minute; 500 API requests per day*"
+* Taking only USD market and first 500 digital currencies, execution time goes up to ~1h48min
+
 # docker-airflow
 [![CircleCI](https://circleci.com/gh/puckel/docker-airflow/tree/master.svg?style=svg)](https://circleci.com/gh/puckel/docker-airflow/tree/master)
 [![Docker Build Status](https://img.shields.io/docker/build/puckel/docker-airflow.svg)]()
