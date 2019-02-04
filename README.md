@@ -3,10 +3,11 @@
 
 Using *DIGITAL_CURRENCY_DAILY* endpoint.
 ### How to
+* Set desired currency and date to sensor at `.env`
 * Run:
 ```bash
 docker-compose build
-docker-compose up -d
+docker-compose up
 ```
 * Check logs: `./logs/digital_currency-*.log`
 * Check outputs under: `./outputs/` (there are some sample outputs)
