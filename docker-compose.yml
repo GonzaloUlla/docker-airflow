@@ -2,14 +2,18 @@ version: '2.1'
 services:
     postgres:
         image: postgres:9.6
+        container_name: postgres-container
         environment:
             - POSTGRES_USER=airflow
             - POSTGRES_PASSWORD=airflow
             - POSTGRES_DB=airflow
+        volumes:
+            - ./scripts:/scripts            
 
     webserver:
         build:
             context: .
+        container_name: webserver-container
         restart: always
         depends_on:
             - postgres
