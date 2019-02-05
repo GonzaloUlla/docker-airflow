@@ -2,6 +2,7 @@
 > Based on: [puckel/docker-airflow](https://github.com/puckel/docker-airflow)
 
 Using *DIGITAL_CURRENCY_DAILY* endpoint.
+
 ### How to
 * Set desired currency and date to sensor at `.env`
 * Run:
@@ -9,8 +10,12 @@ Using *DIGITAL_CURRENCY_DAILY* endpoint.
 docker-compose build
 docker-compose up
 ```
-* Check logs: `./logs/digital_currency-*.log`
+* Check logs at: `localhost:8080` and `./logs/digital_currency-*.log`
 * Check outputs under: `./outputs/` (there are some sample outputs)
+
+#### Analizing Event Logs - PostgreSQL scripts
+* After docker-compose up, run: `./scripts/run_pg_scripts.sh`
+
 ### Notes
 * API throughput limited to *"5 API requests per minute; 500 API requests per day*"
 * Taking only USD market and first 450 digital currencies, execution time goes up to ~1h37min
