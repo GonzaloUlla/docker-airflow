@@ -10,6 +10,7 @@ Using *DIGITAL_CURRENCY_DAILY* endpoint.
 docker-compose build
 docker-compose up
 ```
+    * DAGs should start automatically, if they don't, trigger them manually from Web UI
 * Check logs at: `localhost:8080` and `./logs/digital_currency-*.log`
 * Check outputs under: `./outputs/` (there are some sample outputs)
 
